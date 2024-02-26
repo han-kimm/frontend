@@ -6,6 +6,7 @@ import confetti from "canvas-confetti";
 import { ChangeEvent, FocusEvent, Fragment, MouseEvent, useEffect, useRef, useState } from "react";
 import HorizontalEventCard from "@/components/card/HorizontalEventCard";
 import { instance } from "@/api/api";
+import useInfiniteScroll from "@/hooks/useInfiniteScroll";
 import { openToast } from "@/utils/toast";
 import { EventCardType } from "@/types/index";
 import { TOAST_MESSAGE } from "@/constants/toast";
@@ -14,7 +15,7 @@ import MapIcon from "@/public/icon/map.svg";
 
 const SearchMap = () => {
   const [focus, setFocus] = useState(false);
-  const [selected, setSelected] = useState<EventCardType[]>([]);
+  const [scrollIdx, setScrollIdx] = useState(0);
   const [keyword, setKeyword] = useState("");
   const timer = useRef<NodeJS.Timeout>();
 
@@ -74,9 +75,37 @@ const SearchMap = () => {
     }
   };
 
+  const handleScrollFocus = () => {
+    const container = intersectionRef.current;
+    if (container) {
+      const curScroll = container.scrollTop;
+      const isDown = curScroll > lastScrollRef.current;
+      const idx = Math.floor(container.scrollTop / 178);
+      console.log(idx);
+      setScrollIdx(() => (isDown ? idx + 1 : idx));
+      lastScrollRef.current = curScroll;
+    }
+  };
+
+  const intersectionRef = useRef<HTMLDivElement>();
+  const lastScrollRef = useRef(0);
+
+  useEffect(() => {
+    const container = intersectionRef.current;
+    if (container) {
+      container.addEventListener("scroll", throttle(handleScrollFocus));
+    }
+    return () => {
+      if (container) {
+        container.removeEventListener("scroll", throttle(handleScrollFocus));
+      }
+      setScrollIdx(0);
+    };
+  }, [focus]);
+
   return (
     <div>
-      <HomeKakaoMap scheduleData={myEventsData?.eventList} />
+      <HomeKakaoMap scheduleData={focus ? [myEventsData?.eventList[scrollIdx]] : myEventsData?.eventList} />
       <div className="relative" onFocus={() => setFocus(true)} onBlur={handleBlur}>
         <div className="absolute-center relative z-heart w-4/5 ">
           <button onClick={handleConfetti} className="absolute left-20 top-1/2 -translate-y-1/2">
@@ -90,10 +119,13 @@ const SearchMap = () => {
         </div>
         {focus && (
           <div
-            className={`animate-slideDownSearch absolute left-1/2 top-4 z-base mt-28 w-4/5 -translate-x-1/2 overflow-hidden rounded-lg border border-main-pink-300 bg-white-white`}
+            className={`absolute left-1/2 top-4 z-base mt-28 w-4/5 -translate-x-1/2 animate-slideDownSearch overflow-hidden rounded-lg border border-main-pink-300 bg-white-white`}
           >
             {myEventsData.eventList.length ? (
-              <div className={`flex max-h-[55.6rem] snap-y snap-mandatory flex-col overflow-scroll rounded-lg px-20 pc:px-40`}>
+              <div
+                ref={(el) => (intersectionRef.current = el!)}
+                className={`relative flex max-h-[55.6rem] snap-y snap-mandatory flex-col overflow-scroll rounded-lg px-20 pc:px-40`}
+              >
                 {myEventsData.eventList.map((event: EventCardType) => (
                   <div key={event.id} className="snap-start">
                     <button
@@ -126,4 +158,14 @@ const getPlaceId = async (address: string, placeName: string) => {
   const ret = await data.json();
   if (!ret.documents?.[0]) return;
   return ret.documents?.[0].id;
+};
+
+const throttle = (action: () => void, wait = 500) => {
+  let time = Date.now();
+  return function () {
+    if (time + wait - Date.now() < 0) {
+      action();
+      time = Date.now();
+    }
+  };
 };

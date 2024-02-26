@@ -12,7 +12,7 @@ const HomeKakaoMap = ({ scheduleData }: Props) => {
         const mapContainer = document.getElementById("map");
         const mapOption = {
           center: new window.kakao.maps.LatLng(37.566826, 126.9786567),
-          level: 9,
+          level: 6,
         };
         const map = new window.kakao.maps.Map(mapContainer, mapOption);
         const geocoder = new window.kakao.maps.services.Geocoder();
